@@ -1,0 +1,17 @@
+data_path: data/raw/tinyshakespeare.txt
+block_size: 128
+n_layer: 2
+n_head: 2
+n_embd: 64
+dropout: 0.0
+learning_rate: 0.0003
+batch_size: 8
+max_steps: 200
+eval_interval: 40
+eval_batches: 10
+validation_fraction: 0.1
+seed: 42
+device: auto
+checkpoint_path: checkpoints/tinyshakespeare_cpu.pt
+log_path: logs/tinyshakespeare_cpu.csv
+curve_path: logs/tinyshakespeare_cpu_loss.svg
