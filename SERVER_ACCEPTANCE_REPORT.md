@@ -4,9 +4,9 @@
 
 ## 1. 验收结论
 
-服务器端 TinyLM 启动验收已完成。GPU 环境、PyTorch CUDA、项目测试、Python 编译检查、Shakespeare 数据和短训练冒烟测试均已实际验证通过。
+服务器端 TinyLM 启动验收和第一次正式 GPU 训练均已完成。GPU 环境、PyTorch CUDA、项目测试、Python 编译检查、Shakespeare 数据、短训练冒烟测试和 5000 步正式训练均已实际验证。
 
-当前暂不进入长时间训练，原因是工作区存在此前已有的未提交修改，需要先确认这些修改的处理方式。
+正式训练使用 SLURM 在 `gpu01` 上运行并成功完成。后续训练前仍需注意工作区存在此前已有的未提交修改。
 
 ## 2. 集群与代码状态
 
@@ -16,9 +16,9 @@
 - 本次验证方式：通过 SLURM 申请短时 GPU 任务
 - 项目目录：`/bicmr/home/crispyxt/LLM&Agent Project`
 - Git 分支：`main`
-- Git commit：`d253c69ac48f4eaebe0367c6b45eef3a4edd8e75`
+- Git commit：`a9e1c55de27da2a08dbb790dc2c13a220a6102b5`
 - `HEAD` 与 `origin/main`：一致
-- 长时间训练：未启动
+- 长时间训练：已完成第一次 5000 步训练
 
 ## 3. 工作区状态
 
@@ -33,7 +33,6 @@
  M requirements.txt
  M tests/README.md
  M tiny_lm/__init__.py
-?? SERVER_START_PROMPT.md
 ```
 
 这些修改已在启动过程中报告并保留。验证过程中生成的 `local_llm_agent.egg-info/` 已清理。
@@ -179,7 +178,146 @@ tokenizer
 torch_random_state
 ```
 
-## 8. 当前验收清单
+## 8. 正式 GPU 训练
+
+正式训练使用配置文件：
+
+```text
+configs/tiny_lm_gpu.yaml
+```
+
+关键配置：
+
+```yaml
+n_layer: 2
+n_head: 2
+n_embd: 128
+block_size: 128
+batch_size: 32
+learning_rate: 0.0003
+max_steps: 5000
+eval_interval: 250
+eval_batches: 20
+device: cuda
+```
+
+SLURM 作业：
+
+```text
+Job ID: 1482635
+Partition: gpu
+Node: gpu01
+GPU: 1
+CPU: 8
+Memory: 16G
+Status: COMPLETED
+Exit code: 0:0
+Elapsed: 00:00:59
+```
+
+训练结果：
+
+| 项目 | 初始值 | 最终值 |
+|---|---:|---:|
+| Train Loss | 4.171730 | 1.373604 |
+| Validation Loss | 3.964478 | 1.393005 |
+
+CSV 记录的最后几步如下：
+
+| Step | Train Loss | Validation Loss |
+|---:|---:|---:|
+| 4000 | 1.457341 | 1.459833 |
+| 4250 | 1.445217 | 1.425229 |
+| 4500 | 1.433453 | 1.411957 |
+| 4750 | 1.409022 | 1.382069 |
+| 5000 | 1.373604 | 1.393005 |
+
+训练输出：
+
+```text
+checkpoints/tinyshakespeare_gpu.pt
+logs/tinyshakespeare_gpu.csv
+logs/tinyshakespeare_gpu_loss.svg
+```
+
+文件 SHA-256：
+
+```text
+c2f1b97d06a003d23de6f6f1e50e2be2b84a6bc2b1215e2059540c5d8f36d5f6  checkpoints/tinyshakespeare_gpu.pt
+d4f8d039e1b8c34db5ac44ac660e431b75f7ecf31f8aaa1b50ba96e1c7415249  logs/tinyshakespeare_gpu.csv
+8a8111e6663cd9c2ff6347e717eb9e988dfc402909717fdc16ee4b6dcf  logs/tinyshakespeare_gpu_loss.svg
+```
+
+Checkpoint 的 `step` 为 `4750`，这是因为当前训练实现只在验证 Loss 创新低时保存最佳模型。第 `4750` 步的 Validation Loss 为 `1.382069`，优于第 `5000` 步的 `1.393005`，因此 Checkpoint 保存的是最佳模型，而不是最后一步模型。
+
+## 9. Checkpoint 生成结果
+
+使用最佳 Checkpoint：
+
+```text
+checkpoints/tinyshakespeare_gpu.pt
+```
+
+生成参数：
+
+```text
+max_new_tokens: 220
+随机种子：20260910、20260911、20260912
+```
+
+### 示例一
+
+Prompt：`ROMEO:`
+Temperature：`0.7`
+
+```text
+ROMEO:
+That's the duke.
+
+JOHN OF GAUNT:
+I cannot contrary to your brother, your daughter:
+He hands and he spoor ender and home Most my foe
+The liban-saye want that my live,
+And therefore the famedity a prayers
+To fortune to an
+```
+
+### 示例二
+
+Prompt：`HAMLET:`
+Temperature：`0.8`
+
+```text
+HAMLET:
+Madam, father, stay thee comes devil,
+Take him yet? we content now. Hark: he bein mild
+in hand, and the worlding ribunes sufference;
+And me not thing scape storn; sirreturness,
+That I not him to with a gone, and England
+```
+
+### 示例三
+
+Prompt：`KING:`
+Temperature：`0.9`
+
+```text
+KING:
+I lord, they and with triumphan my brother,
+And break for one any I will my sorry;
+Here but I come; for my son, he worst commend
+are it shall be much a traitor. Let's name,
+Be shall be honest, the shall care, the sensho
+```
+
+### 生成质量初步评价
+
+- 模型已经学习到 Shakespeare 语料的部分形式特征，包括角色名、冒号、戏剧对白分行和古英语词汇。
+- 输出仍存在明显的句法不稳定、词语组合不连贯和长文本语义一致性不足。
+- 部分词形是字符级模型根据局部上下文生成的近似组合。
+- 当前结果说明训练和生成流程已经闭环，但模型容量与训练规模仍不足以生成高质量连贯文本。
+
+## 10. 当前验收清单
 
 ```text
 [x] GPU 计算节点可通过 SLURM 申请
@@ -196,16 +334,15 @@ torch_random_state
 [x] SVG Loss 曲线已生成
 [x] 验收结果已记录
 [ ] 工作区无未报告修改
-[ ] 进入长时间 GPU 训练
+[x] 第一次 5000 步 GPU 训练成功
 ```
 
-## 9. 下一步
+## 11. 下一步
 
-等待本地确认工作区未提交修改的处理方式。确认后再决定是否：
+等待下一步指令。后续可以：
 
-1. 保留这些修改并建立服务器端正式 GPU 配置；
-2. 创建独立的 `local-llm-agent` 环境；
-3. 使用正式配置运行更长的 TinyLM 训练；
-4. 记录正式实验结果。
+1. 进一步分析 `logs/tinyshakespeare_gpu_loss.svg`；
+2. 根据 Loss 和生成结果决定是否调整学习率、模型规模或训练步数；
+3. 在确认工作区修改处理方式后，再进行新的实验。
 
-在收到下一步指令前，不启动 5000 步或更长时间训练，也不开始更大模型、Agent、RAG 或微调实验。
+在收到下一步指令前，不自行启动新的长时间训练，也不开始更大模型、Agent、RAG 或微调实验。
