@@ -1,0 +1,17 @@
+﻿data_path: data/raw/tinyshakespeare.txt
+block_size: 128
+n_layer: 2
+n_head: 2
+n_embd: 128
+dropout: 0.0
+learning_rate: 0.0003
+batch_size: 32
+max_steps: 5000
+eval_interval: 250
+eval_batches: 20
+validation_fraction: 0.1
+seed: 42
+device: cuda
+checkpoint_path: checkpoints/tinyshakespeare_gpu.pt
+log_path: logs/tinyshakespeare_gpu.csv
+curve_path: logs/tinyshakespeare_gpu_loss.svg
